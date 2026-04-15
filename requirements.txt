@@ -1,5 +1,7 @@
 affine @ file:///home/conda/feedstock_root/build_artifacts/affine_1733762038348/work
 aiobotocore==2.24.3
+hydromt==0.10.1
+hydromt-wflow==0.8.0
 aiohappyeyeballs==2.6.1
 aiohttp==3.13.0
 aioitertools==0.12.0
