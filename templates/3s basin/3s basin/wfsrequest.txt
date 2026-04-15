@@ -1,1 +1,0 @@
-https://app.mrcmekong.org/geogiz3s/basin3s/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=basin3s:bas_sub_basins&maxFeatures=10000000&outputFormat=SHAPE-ZIP
