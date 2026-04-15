@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title> Hydrological Model Builder </title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        #map { height: 400px; width: 100%; z-index: 1; }
+        .draw-btn-active { background-color: #28a745 !important; }
+        .extent-compass {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            margin: 20px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 12px;
+            border: 1px solid #e0e0e0;
+        }
+        .compass-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 80px;
+            width: 100%;
+            padding: 0 20px;
+        }
+        .compass-item-north, .compass-item-south { width: 200px; margin: 0 auto; }
+        .compass-item-west, .compass-item-east { width: 200px; }
+        .compass-label { font-weight: 600; font-size: 14px; margin-bottom: 8px; display: flex; justify-content: center; gap: 8px; }
+        .compass-item input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; text-align: center; }
+        .compass-item input, .centerpoint-item input, #point-lon, #point-lat { -moz-appearance: textfield; }
+        .compass-hint { font-size: 10px; color: #666; margin-top: 5px; }
+        .center-buttons-compass { display: flex; justify-content: center; gap: 15px; margin-top: 15px; }
+        .btn-center-compass { background-color: #3498db; color: white; border: none; padding: 6px 16px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+        .btn-center-compass:hover { background-color: #2980b9; }
+        .coord-separator { text-align: center; font-weight: bold; color: #3498db; margin: 20px 0 15px 0; }
+        .centerpoint-box { margin: 20px 0; padding: 20px; background: #f8f9fa; border-radius: 12px; border: 1px solid #e0e0e0; }
+        .centerpoint-row { display: flex; justify-content: center; gap: 30px; margin-bottom: 20px; }
+        .centerpoint-item { flex: 1; max-width: 250px; text-align: center; }
+        .centerpoint-label { font-weight: 600; font-size: 14px; margin-bottom: 8px; display: flex; justify-content: center; gap: 8px; }
+        .centerpoint-item input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; text-align: center; }
+        .span-control { display: flex; align-items: center; justify-content: center; gap: 15px; margin: 20px 0; }
+        .span-control input { width: 120px; padding: 8px; border: 1px solid #ddd; border-radius: 6px; text-align: center; }
+        .apply-center-btn { background-color: #3498db; color: white; border: none; padding: 8px 20px; border-radius: 6px; cursor: pointer; }
+        .apply-center-btn:hover { background-color: #2980b9; }
+        .coord-help { font-size: 11px; color: #666; margin-top: 5px; text-align: center; }
+        .shapefile-upload { margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 8px; border: 2px dashed #3498db; text-align: center; }
+        .file-input-label { display: inline-block; padding: 10px 20px; background: #3498db; color: white; border-radius: 6px; cursor: pointer; font-size: 14px; }
+        .file-input-label:hover { background: #2980b9; }
+        input[type="file"] { display: none; }
+        .upload-status { margin-top: 10px; padding: 8px; border-radius: 4px; font-size: 12px; }
+        .upload-success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .upload-error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .upload-info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        .upload-warning { background: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
+        .shapefile-info { margin-top: 10px; padding: 8px; background: #e8f4f8; border-radius: 4px; font-size: 11px; text-align: left; display: none; }
+        .shapefile-info.show { display: block; }
+        .remove-shapefile-btn { background-color: #dc3545; color: white; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer; font-size: 10px; margin-top: 5px; }
+        .btn-primary { background-color: #3498db; color: white; padding: 12px 24px; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; width: 100%; margin-top: 20px; }
+        .btn-primary:hover { background-color: #2980b9; }
+        .btn-small { background-color: #6c757d; color: white; padding: 5px 12px; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; margin: 2px; }
+        .btn-small:hover { background-color: #5a6268; }
+        .btn-draw { background-color: #28a745; }
+        .btn-draw:hover { background-color: #218838; }
+        .card { background: white; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .main-content { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        @media (max-width: 768px) { .main-content { grid-template-columns: 1fr; } .compass-row { flex-direction: column; align-items: center; gap: 15px; } .centerpoint-row { flex-direction: column; align-items: center; } }
+        .coordinate-inputs { display: flex; gap: 10px; }
+        .coordinate-inputs input { flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 8px; font-weight: 600; }
+        .status-badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
+        .status-badge.completed { background: #d4edda; color: #155724; }
+        .status-badge.running { background: #d1ecf1; color: #0c5460; }
+        .status-badge.pending { background: #fff3cd; color: #856404; }
+        .status-badge.failed { background: #f8d7da; color: #721c24; }
+        .progress-bar { height: 20px; background: #e9ecef; border-radius: 10px; overflow: hidden; margin: 10px 0; }
+        .progress-fill { height: 100%; background: #3498db; transition: width 0.3s; }
+        .stats-grid { display: flex; gap: 20px; margin-top: 10px; }
+        .stat-item { background: #f8f9fa; padding: 10px; border-radius: 6px; flex: 1; text-align: center; }
+        .file-list { max-height: 200px; overflow-y: auto; font-size: 12px; }
+        .button-group { display: flex; gap: 10px; margin-top: 20px; }
+        .btn-success { background-color: #28a745; color: white; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; }
+        .btn-secondary { background-color: #6c757d; color: white; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; }
+        #loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 1000; }
+        .loading-spinner { width: 50px; height: 50px; border: 5px solid #fff; border-top-color: #3498db; border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .drainage-warning { background: #fff3cd; border-left: 4px solid #ffc107; padding: 10px; margin: 10px 0; border-radius: 4px; display: none; }
+        .drainage-warning.show { display: block; }
+        .map-controls { display: flex; gap: 5px; margin-top: 10px; flex-wrap: wrap; }
+        .draw-instruction { font-size: 11px; color: #28a745; margin-top: 5px; display: none; }
+        .draw-instruction.show { display: block; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header><h1>🌊 Hydrological Model Builder</h1><p>Build and run hydrological models on single click</p></header>
+        <div class="main-content">
+            <div class="card" id="input-card">
+                <h2>Model Parameters</h2>
+                <form id="wflow-form">
+                    <div class="form-group">
+                        <label>Region Extent:</label>
+                        <div class="shapefile-upload">
+                            <div><strong>📁 Upload Shapefile</strong></div>
+                            <label class="file-input-label">Choose Shapefile (.zip)<input type="file" id="shapefile-input" accept=".zip"></label>
+                            <div id="upload-status" class="upload-status" style="display:none"></div>
+                            <div id="shapefile-info" class="shapefile-info"><strong>📊 Shapefile Info:</strong><div id="shapefile-details"></div><button id="remove-shapefile" class="remove-shapefile-btn">Remove Shapefile</button></div>
+                            <div class="coord-help">💡 Upload a ZIP file containing .shp, .shx, and .dbf files</div>
+                        </div>
+                        <div class="coord-separator">— OR Manually Enter Coordinates —</div>
+                        <div class="extent-compass">
+                            <div class="compass-item-north"><div class="compass-label">⬆️ NORTH ⬆️</div><input type="number" id="north" step="any" placeholder="e.g., 29.00" required><div class="compass-hint">↑ Top boundary (max latitude)</div></div>
+                            <div class="compass-row">
+                                <div class="compass-item-west"><div class="compass-label">⬅️ WEST</div><input type="number" id="west" step="any" placeholder="e.g., 64.11" required><div class="compass-hint">← Left boundary (min longitude)</div></div>
+                                <div class="compass-item-east"><div class="compass-label">EAST ➡️</div><input type="number" id="east" step="any" placeholder="e.g., 66.64" required><div class="compass-hint">→ Right boundary (max longitude)</div></div>
+                            </div>
+                            <div class="compass-item-south"><div class="compass-label">⬇️ SOUTH ⬇️</div><input type="number" id="south" step="any" placeholder="e.g., 25.27" required><div class="compass-hint">↓ Bottom boundary (min latitude)</div></div>
+                            <div class="center-buttons-compass"><button type="button" id="center-north-btn" class="btn-center-compass">📍 Center on North</button><button type="button" id="center-south-btn" class="btn-center-compass">📍 Center on South</button></div>
+                        </div>
+                        <div class="coord-separator">— OR Draw Rectangle on Map —</div>
+                        <div style="text-align: center; margin: 10px 0;">
+                            <button type="button" id="draw-rectangle-btn" class="btn-small btn-draw">✏️ Draw Rectangle</button>
+                            <button type="button" id="cancel-draw-btn" class="btn-small" style="display:none;">❌ Cancel Drawing</button>
+                            <div id="draw-instruction" class="draw-instruction">📍 Click on map to start drawing rectangle. Click again to complete.</div>
+                        </div>
+                        <div class="coord-separator">— OR Set by Center Point —</div>
+                        <div class="centerpoint-box">
+                            <div class="centerpoint-row">
+                                <div class="centerpoint-item"><div class="centerpoint-label">🎯 CENTER LATITUDE 🎯</div><input type="number" id="center-lat" step="any" placeholder="Center latitude"><div class="centerpoint-hint">Center point latitude</div></div>
+                                <div class="centerpoint-item"><div class="centerpoint-label">🎯 CENTER LONGITUDE 🎯</div><input type="number" id="center-lon" step="any" placeholder="Center longitude"><div class="centerpoint-hint">Center point longitude</div></div>
+                            </div>
+                            <div class="span-control"><label>📏 SPAN (degrees):</label><input type="number" id="span-deg" step="any" value="2.5"><button type="button" id="apply-center-btn" class="apply-center-btn">Apply Center & Span</button></div>
+                            <div class="coord-help">💡 Set region by center point and total span (e.g., 2.5° = ~275km)</div>
+                        </div>
+                        <small class="coord-help">📌 Example: North 29.00, South 25.27, West 64.11, East 66.64</small>
+                    </div>
+                    <div class="form-group"><label>Discharge Point (Longitude, Latitude):</label><div class="coordinate-inputs"><input type="number" id="point-lon" step="any" placeholder="Longitude" required><input type="number" id="point-lat" step="any" placeholder="Latitude" required></div><small class="coord-help">Click on map to set point</small></div>
+                    <div id="drainage-warning" class="drainage-warning"></div>
+                    <div class="form-group"><label>Start Date:</label><input type="date" id="start-date" required></div>
+                    <div class="form-group"><label>End Date:</label><input type="date" id="end-date" required></div>
+                    <div class="form-group"><label>Earth Engine Project ID:</label><input type="text" id="project-id" value="smart-theory-460821-e3"><small class="coord-help">Your Google Earth Engine project ID</small></div>
+                    <button type="submit" class="btn-primary">Build & Run Model</button>
+                </form>
+            </div>
+            <div class="card" id="map-card">
+                <h2>Region Preview</h2>
+                <div id="map"></div>
+                <div class="map-controls">
+                    <button id="fit-extent-btn" class="btn-small">Fit to Extent</button>
+                    <button id="clear-point-btn" class="btn-small">Clear Point</button>
+                    <button id="clear-rectangle-btn" class="btn-small">Clear Rectangle</button>
+                </div>
+                <p class="coord-help">🖱️ Click on map to set discharge point | Drag to navigate | Use layer control (top-right) to switch maps</p>
+            </div>
+            <div class="card" id="status-card" style="display:none"><h2>Job Status</h2><div id="job-info"><p>Job ID: <span id="job-id"></span></p><p>Status: <span id="job-status" class="status-badge"></span></p><p>Progress: <span id="job-progress"></span></p><p>Message: <span id="job-message"></span></p></div><div class="progress-bar"><div id="progress-fill" class="progress-fill" style="width:0%"></div></div>
+                <div id="simulation-results" style="display:none"><h3>Simulation Results</h3><div class="results-summary"><p><strong>Build Time:</strong> <span id="build-time"></span></p><p><strong>Simulation Time:</strong> <span id="sim-time"></span></p><p><strong>Method:</strong> <span id="sim-method"></span></p></div><div id="discharge-chart"><canvas id="discharge-canvas" width="600" height="300"></canvas></div><div><p><strong>Discharge Statistics:</strong></p><div id="discharge-stats" class="stats-grid"></div></div><div><p><strong>Output Files:</strong></p><ul id="output-files-list" class="file-list"></ul></div></div>
+                <div class="button-group"><button id="download-btn" style="display:none" class="btn-success">Download Results (ZIP)</button><button id="new-job-btn" style="display:none" class="btn-secondary">Create New Job</button></div>
+            </div>
+        </div>
+    </div>
+    <div id="loading-overlay" style="display:none"><div class="loading-spinner"></div></div>
+
+    <script>
+        const map = L.map('map', { scrollWheelZoom: false }).setView([27.0, 65.0], 7);
+        map.on('mouseover', () => map.scrollWheelZoom.enable());
+        map.on('mouseout', () => map.scrollWheelZoom.disable());
+        
+        const baseLayers = {
+            "OpenStreetMap": L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }),
+            "Satellite": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: '© Esri' }),
+            "Topographic": L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { attribution: '© OpenTopoMap' })
+        };
+        const overlays = { "🌊 Global Waterways": L.tileLayer('https://tiles.waterwaymap.org/tiles/{z}/{x}/{y}.png', { attribution: '© WaterwayMap.org', maxZoom: 14 }) };
+        L.control.layers(baseLayers, overlays, { position: 'topright' }).addTo(map);
+        baseLayers["OpenStreetMap"].addTo(map);
+        
+        let extentRect = null, marker = null, shapefileLayer = null, bufferedLayer = null;
+        let drawnRectangle = null;
+        let isDrawing = false;
+        let startPoint = null;
+        let tempRectangle = null;
+        
+        // Rectangle drawing functionality
+        const drawBtn = document.getElementById('draw-rectangle-btn');
+        const cancelDrawBtn = document.getElementById('cancel-draw-btn');
+        const drawInstruction = document.getElementById('draw-instruction');
+        const clearRectBtn = document.getElementById('clear-rectangle-btn');
+        
+        function startDrawing() {
+            isDrawing = true;
+            startPoint = null;
+            drawBtn.style.display = 'none';
+            cancelDrawBtn.style.display = 'inline-block';
+            drawInstruction.classList.add('show');
+            map.dragging.disable();
+            map.on('click', onMapClickForDraw);
+            map.on('mousemove', onMouseMoveForDraw);
+        }
+        
+        function cancelDrawing() {
+            isDrawing = false;
+            if (tempRectangle) map.removeLayer(tempRectangle);
+            tempRectangle = null;
+            startPoint = null;
+            drawBtn.style.display = 'inline-block';
+            cancelDrawBtn.style.display = 'none';
+            drawInstruction.classList.remove('show');
+            map.dragging.enable();
+            map.off('click', onMapClickForDraw);
+            map.off('mousemove', onMouseMoveForDraw);
+        }
+        
+        function onMapClickForDraw(e) {
+            if (!isDrawing) return;
+            if (!startPoint) {
+                startPoint = e.latlng;
+                tempRectangle = L.rectangle([startPoint, startPoint], { color: '#28a745', weight: 2, fillOpacity: 0.2, fillColor: '#28a745' }).addTo(map);
+            } else {
+                const bounds = L.latLngBounds(startPoint, e.latlng);
+                finishDrawing(bounds);
+            }
+        }
+        
+        function onMouseMoveForDraw(e) {
+            if (!isDrawing || !startPoint) return;
+            if (tempRectangle) map.removeLayer(tempRectangle);
+            tempRectangle = L.rectangle([startPoint, e.latlng], { color: '#28a745', weight: 2, fillOpacity: 0.2, fillColor: '#28a745' }).addTo(map);
+        }
+        
+        function finishDrawing(bounds) {
+            if (drawnRectangle) map.removeLayer(drawnRectangle);
+            drawnRectangle = L.rectangle(bounds, { color: '#28a745', weight: 3, fillOpacity: 0.2, fillColor: '#28a745' }).addTo(map);
+            
+            const southWest = bounds.getSouthWest();
+            const northEast = bounds.getNorthEast();
+            const west = southWest.lng;
+            const south = southWest.lat;
+            const east = northEast.lng;
+            const north = northEast.lat;
+            
+            setExtent(west, south, east, north);
+            
+            cancelDrawing();
+            
+            setTimeout(() => {
+                checkDrainageLocation();
+            }, 100);
+        }
+        
+        clearRectBtn.addEventListener('click', () => {
+            if (drawnRectangle) map.removeLayer(drawnRectangle);
+            drawnRectangle = null;
+            cancelDrawing();
+        });
+        
+        drawBtn.addEventListener('click', startDrawing);
+        cancelDrawBtn.addEventListener('click', cancelDrawing);
+        
+        // Drainage area validation
+        function checkDrainageLocation() {
+            const pointLon = parseFloat(document.getElementById('point-lon').value);
+            const pointLat = parseFloat(document.getElementById('point-lat').value);
+            const west = parseFloat(document.getElementById('west').value);
+            const south = parseFloat(document.getElementById('south').value);
+            const east = parseFloat(document.getElementById('east').value);
+            const north = parseFloat(document.getElementById('north').value);
+            
+            const warningDiv = document.getElementById('drainage-warning');
+            
+            if (!isNaN(pointLon) && !isNaN(pointLat) && !isNaN(west) && !isNaN(south) && !isNaN(east) && !isNaN(north)) {
+                const isInside = pointLon >= west && pointLon <= east && pointLat >= south && pointLat <= north;
+                
+                if (!isInside) {
+                    warningDiv.innerHTML = `⚠️ <strong>Warning:</strong> Discharge point (${pointLon.toFixed(4)}, ${pointLat.toFixed(4)}) is OUTSIDE the selected region extent!<br>
+                    The model may not generate valid discharge data. Please adjust the extent or move the discharge point.`;
+                    warningDiv.classList.add('show');
+                } else {
+                    warningDiv.classList.remove('show');
+                }
+            }
+        }
+        
+        function updateExtent() {
+            const west = parseFloat(document.getElementById('west').value);
+            const south = parseFloat(document.getElementById('south').value);
+            const east = parseFloat(document.getElementById('east').value);
+            const north = parseFloat(document.getElementById('north').value);
+            if (!isNaN(west) && !isNaN(south) && !isNaN(east) && !isNaN(north)) {
+                if (extentRect) map.removeLayer(extentRect);
+                extentRect = L.rectangle([[south, west], [north, east]], { color: '#3498db', weight: 2, fillOpacity: 0.1, dashArray: '5,5' }).addTo(map);
+                checkDrainageLocation();
+            }
+        }
+        
+        function setExtent(west, south, east, north) {
+            document.getElementById('west').value = west;
+            document.getElementById('south').value = south;
+            document.getElementById('east').value = east;
+            document.getElementById('north').value = north;
+            updateExtent();
+            fitToExtent();
+        }
+        
+        function fitToExtent() {
+            const west = parseFloat(document.getElementById('west').value);
+            const south = parseFloat(document.getElementById('south').value);
+            const east = parseFloat(document.getElementById('east').value);
+            const north = parseFloat(document.getElementById('north').value);
+            if (!isNaN(west) && !isNaN(south) && !isNaN(east) && !isNaN(north)) {
+                map.fitBounds([[south, west], [north, east]]);
+            }
+        }
+        
+        async function parseShapefile(file) {
+            const buffer = 0.15;
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = async function(e) {
+                    try {
+                        const zip = await JSZip.loadAsync(e.target.result);
+                        let shpFile = null;
+                        for (const name in zip.files) if (name.toLowerCase().endsWith('.shp')) { shpFile = zip.files[name]; break; }
+                        if (!shpFile) reject(new Error('No .shp file found'));
+                        const buffer = await shpFile.async('arraybuffer');
+                        const view = new DataView(buffer);
+                        const xmin = view.getFloat64(36, true), ymin = view.getFloat64(44, true), xmax = view.getFloat64(52, true), ymax = view.getFloat64(60, true);
+                        if (isNaN(xmin)) reject(new Error('Invalid shapefile'));
+                        resolve({ west: xmin - 0.15, south: ymin - 0.15, east: xmax + 0.15, north: ymax + 0.15, original: { minLon: xmin, minLat: ymin, maxLon: xmax, maxLat: ymax }, fileName: file.name });
+                    } catch (err) { reject(err); }
+                };
+                reader.onerror = () => reject(new Error('Error reading file'));
+                reader.readAsArrayBuffer(file);
+            });
+        }
+        
+        document.getElementById('shapefile-input').addEventListener('change', async function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const statusDiv = document.getElementById('upload-status');
+            statusDiv.style.display = 'block'; statusDiv.className = 'upload-status upload-info'; statusDiv.textContent = 'Processing...';
+            try {
+                const extent = await parseShapefile(file);
+                setExtent(extent.west, extent.south, extent.east, extent.north);
+                if (shapefileLayer) map.removeLayer(shapefileLayer);
+                if (bufferedLayer) map.removeLayer(bufferedLayer);
+                shapefileLayer = L.rectangle([[extent.original.minLat, extent.original.minLon], [extent.original.maxLat, extent.original.maxLon]], { color: '#2c3e50', weight: 2, fillOpacity: 0.3, fillColor: '#3498db' }).addTo(map);
+                shapefileLayer.bindPopup(`<strong>📁 ${extent.fileName}</strong><br>Original bounds`);
+                bufferedLayer = L.rectangle([[extent.south, extent.west], [extent.north, extent.east]], { color: '#ff7800', weight: 3, fillOpacity: 0.1, dashArray: '5,8' }).addTo(map);
+                bufferedLayer.bindPopup(`<strong>📐 Modeling Extent (0.15° buffer)</strong>`);
+                document.getElementById('shapefile-details').innerHTML = `File: ${extent.fileName}<br>Original: ${extent.original.minLon.toFixed(6)}° to ${extent.original.maxLon.toFixed(6)}° lon, ${extent.original.minLat.toFixed(6)}° to ${extent.original.maxLat.toFixed(6)}° lat<br><span style="color:#ff7800;">Buffered: ${extent.west.toFixed(6)}° to ${extent.east.toFixed(6)}° lon, ${extent.south.toFixed(6)}° to ${extent.north.toFixed(6)}° lat</span>`;
+                document.getElementById('shapefile-info').classList.add('show');
+                statusDiv.className = 'upload-status upload-success'; statusDiv.textContent = '✓ Shapefile loaded';
+                updateCenterFromExtent();
+                checkDrainageLocation();
+            } catch (err) { statusDiv.className = 'upload-status upload-error'; statusDiv.textContent = '✗ Error: ' + err.message; }
+            e.target.value = '';
+        });
+        
+        document.getElementById('remove-shapefile').addEventListener('click', () => {
+            if (shapefileLayer) map.removeLayer(shapefileLayer);
+            if (bufferedLayer) map.removeLayer(bufferedLayer);
+            document.getElementById('shapefile-info').classList.remove('show');
+        });
+        
+        document.getElementById('center-north-btn').onclick = () => { const w = parseFloat(document.getElementById('west').value), e = parseFloat(document.getElementById('east').value), n = parseFloat(document.getElementById('north').value); if (!isNaN(w) && !isNaN(e) && !isNaN(n)) map.setView([n, (w+e)/2], map.getZoom()); else alert('Enter West, East, North'); };
+        document.getElementById('center-south-btn').onclick = () => { const w = parseFloat(document.getElementById('west').value), e = parseFloat(document.getElementById('east').value), s = parseFloat(document.getElementById('south').value); if (!isNaN(w) && !isNaN(e) && !isNaN(s)) map.setView([s, (w+e)/2], map.getZoom()); else alert('Enter West, East, South'); };
+        document.getElementById('apply-center-btn').onclick = () => { const lat = parseFloat(document.getElementById('center-lat').value), lon = parseFloat(document.getElementById('center-lon').value), span = parseFloat(document.getElementById('span-deg').value); if (!isNaN(lat) && !isNaN(lon) && !isNaN(span) && span>0) { const h = span/2; setExtent(lon-h, lat-h, lon+h, lat+h); updateCenterFromExtent(); } else alert('Enter valid center and span'); };
+        
+        map.on('click', e => {
+            document.getElementById('point-lat').value = e.latlng.lat.toFixed(8);
+            document.getElementById('point-lon').value = e.latlng.lng.toFixed(8);
+            if (marker) map.removeLayer(marker);
+            marker = L.marker(e.latlng, { icon: L.divIcon({ html: '📍', iconSize: [20,20] }) }).addTo(map);
+            checkDrainageLocation();
+        });
+        
+        document.getElementById('fit-extent-btn').onclick = fitToExtent;
+        document.getElementById('clear-point-btn').onclick = () => { document.getElementById('point-lat').value = ''; document.getElementById('point-lon').value = ''; if(marker) map.removeLayer(marker); marker = null; checkDrainageLocation(); };
+        ['west','south','east','north'].forEach(id => document.getElementById(id).addEventListener('change', updateExtent));
+        
+        function updateCenterFromExtent() {
+            const w = parseFloat(document.getElementById('west').value), s = parseFloat(document.getElementById('south').value), e = parseFloat(document.getElementById('east').value), n = parseFloat(document.getElementById('north').value);
+            if (!isNaN(w) && !isNaN(s) && !isNaN(e) && !isNaN(n)) {
+                document.getElementById('center-lat').value = ((n+s)/2).toString();
+                document.getElementById('center-lon').value = ((e+w)/2).toString();
+                document.getElementById('span-deg').value = Math.max(n-s, e-w).toString();
+            }
+        }
+        ['west','south','east','north'].forEach(id => document.getElementById(id).addEventListener('change', updateCenterFromExtent));
+        
+        document.getElementById('north').value = '29.00'; document.getElementById('south').value = '25.27'; document.getElementById('west').value = '64.11'; document.getElementById('east').value = '66.64';
+        document.getElementById('point-lon').value = '65.51229'; document.getElementById('point-lat').value = '25.37971';
+        document.getElementById('start-date').value = '2003-01-01'; document.getElementById('end-date').value = '2003-01-31';
+        updateCenterFromExtent(); updateExtent(); fitToExtent(); checkDrainageLocation();
+        
+        document.getElementById('wflow-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const pointLon = parseFloat(document.getElementById('point-lon').value);
+            const pointLat = parseFloat(document.getElementById('point-lat').value);
+            const west = parseFloat(document.getElementById('west').value);
+            const south = parseFloat(document.getElementById('south').value);
+            const east = parseFloat(document.getElementById('east').value);
+            const north = parseFloat(document.getElementById('north').value);
+            
+            if (pointLon < west || pointLon > east || pointLat < south || pointLat > north) {
+                if (!confirm('⚠️ Warning: Discharge point is OUTSIDE the selected region extent!\n\nThis may cause the model to fail or produce no discharge data.\n\nDo you want to continue anyway?')) {
+                    return;
+                }
+            }
+            
+            const formData = {
+                extent: [west, south, east, north],
+                subbasin_points: [pointLon, pointLat],
+                start_date: document.getElementById('start-date').value,
+                end_date: document.getElementById('end-date').value,
+                project_id: document.getElementById('project-id').value
+            };
+            document.getElementById('loading-overlay').style.display = 'flex';
+            try {
+                const res = await fetch('/api/submit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(formData) });
+                const data = await res.json();
+                document.getElementById('loading-overlay').style.display = 'none';
+                if (res.ok) {
+                    document.getElementById('input-card').style.display = 'none';
+                    document.getElementById('status-card').style.display = 'block';
+                    document.getElementById('job-id').textContent = data.job_id;
+                    pollJobStatus(data.job_id);
+                } else alert('Error: ' + data.error);
+            } catch(err) { document.getElementById('loading-overlay').style.display = 'none'; alert('Error: ' + err); }
+        });
+        
+        async function pollJobStatus(jobId) {
+            const interval = setInterval(async () => {
+                try {
+                    const res = await fetch(`/api/status/${jobId}`);
+                    const data = await res.json();
+                    document.getElementById('job-status').textContent = data.status;
+                    document.getElementById('job-progress').textContent = data.progress + '%';
+                    document.getElementById('job-message').textContent = data.message;
+                    document.getElementById('progress-fill').style.width = data.progress + '%';
+                    document.getElementById('job-status').className = 'status-badge ' + data.status;
+                    if (data.status === 'completed') {
+                        clearInterval(interval);
+                        await fetchSimulationResults(jobId);
+                        document.getElementById('download-btn').style.display = 'inline-block';
+                        document.getElementById('new-job-btn').style.display = 'inline-block';
+                        document.getElementById('download-btn').onclick = () => window.location.href = `/api/download/${jobId}`;
+                        document.getElementById('new-job-btn').onclick = () => { document.getElementById('status-card').style.display = 'none'; document.getElementById('input-card').style.display = 'block'; document.getElementById('simulation-results').style.display = 'none'; };
+                    } else if (data.status === 'failed') {
+                        clearInterval(interval);
+                        document.getElementById('new-job-btn').style.display = 'inline-block';
+                        document.getElementById('new-job-btn').onclick = () => { document.getElementById('status-card').style.display = 'none'; document.getElementById('input-card').style.display = 'block'; };
+                        alert('Job failed: ' + data.message);
+                    }
+                } catch(err) { console.error(err); }
+            }, 2000);
+        }
+        
+        async function fetchSimulationResults(jobId) {
+            try {
+                const res = await fetch(`/api/simulation-status/${jobId}`);
+                const data = await res.json();
+                if (data.status === 'completed') {
+                    document.getElementById('simulation-results').style.display = 'block';
+                    document.getElementById('build-time').textContent = data.build_time ? data.build_time.toFixed(2) + ' seconds' : 'N/A';
+                    document.getElementById('sim-time').textContent = data.simulation_time ? data.simulation_time.toFixed(2) + ' seconds' : 'N/A';
+                    document.getElementById('sim-method').textContent = data.simulation_method || 'N/A';
+                    const filesList = document.getElementById('output-files-list');
+                    filesList.innerHTML = '';
+                    if (data.output_files) {
+                        for (const [type, files] of Object.entries(data.output_files)) {
+                            if (files.length) {
+                                const li = document.createElement('li');
+                                li.innerHTML = `<strong>${type.toUpperCase()}:</strong> ${files.length} file(s)`;
+                                filesList.appendChild(li);
+                                const ul = document.createElement('ul');
+                                files.slice(0,5).forEach(f => { const item = document.createElement('li'); item.textContent = f.split('/').pop(); ul.appendChild(item); });
+                                if (files.length > 5) { const more = document.createElement('li'); more.textContent = `... and ${files.length-5} more`; more.style.fontStyle = 'italic'; ul.appendChild(more); }
+                                filesList.appendChild(ul);
+                            }
+                        }
+                    }
+                    if (data.discharge_csv) fetchDischargeData(jobId);
+                }
+            } catch(err) { console.error(err); }
+        }
+        
+        async function fetchDischargeData(jobId) {
+            try {
+                const res = await fetch(`/api/discharge/${jobId}`);
+                const data = await res.json();
+                if (res.ok) {
+                    plotDischarge(data.time, data.discharge);
+                    const d = data.discharge.filter(v => v !== null && !isNaN(v));
+                    if (d.length) {
+                        const mean = (d.reduce((a,b)=>a+b,0)/d.length).toFixed(2);
+                        const max = Math.max(...d).toFixed(2);
+                        const min = Math.min(...d).toFixed(2);
+                        document.getElementById('discharge-stats').innerHTML = `<div class="stat-item">Mean: ${mean} m³/s</div><div class="stat-item">Max: ${max} m³/s</div><div class="stat-item">Min: ${min} m³/s</div>`;
+                    }
+                }
+            } catch(err) { console.error(err); }
+        }
+        
+        function plotDischarge(times, discharge) {
+            const canvas = document.getElementById('discharge-canvas');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0,0,canvas.width,canvas.height);
+            if (!times || !discharge || discharge.length === 0) { ctx.fillText('No data', 200,150); return; }
+            const valid = discharge.map((v,i)=>({v,i})).filter(d=>!isNaN(d.v));
+            if (!valid.length) return;
+            const values = valid.map(d=>d.v), indices = valid.map(d=>d.i);
+            const maxQ = Math.max(...values), minQ = Math.min(...values), range = maxQ - minQ || 1;
+            ctx.strokeStyle = '#333'; ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.moveTo(50,30); ctx.lineTo(50,canvas.height-50); ctx.lineTo(canvas.width-30,canvas.height-50); ctx.stroke();
+            ctx.strokeStyle = '#eee';
+            for(let i=0;i<=4;i++){ const y=30+i*(canvas.height-100)/4; ctx.beginPath(); ctx.moveTo(50,y); ctx.lineTo(canvas.width-30,y); ctx.stroke(); }
+            ctx.beginPath(); ctx.strokeStyle = '#e74c3c'; ctx.lineWidth = 2;
+            const xStep = (canvas.width-100)/(indices.length-1), yScale = (canvas.height-100)/range;
+            for(let i=0;i<indices.length;i++){ const x=50+i*xStep, y=canvas.height-50-(values[i]-minQ)*yScale; if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); }
+            ctx.stroke();
+            ctx.fillStyle = '#333'; ctx.font = '12px Arial'; ctx.fillText('Time', canvas.width-80, canvas.height-20);
+            ctx.save(); ctx.translate(15, canvas.height/2); ctx.rotate(-Math.PI/2); ctx.fillText('Discharge (m³/s)',0,0); ctx.restore();
+            ctx.font = 'bold 14px Arial'; ctx.fillStyle = '#2c3e50'; ctx.fillText('Discharge at Outlet', 250,20);
+            ctx.font = '11px Arial'; ctx.fillStyle = '#7f8c8d'; ctx.fillText(`Max: ${maxQ.toFixed(2)}`, canvas.width-150,50); ctx.fillText(`Min: ${minQ.toFixed(2)}`, canvas.width-150,70);
+        }
+    </script>
+</body>
+</html>

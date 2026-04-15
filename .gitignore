@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.pyc
+
+# Environment
+.env
+.venv/
+
+# Temp / outputs
+tmp/
+output/
+logs/
+
+# Data (important for hydrology work)
+*.nc
+*.tif
+*.csv
+
+# OS junk
+.DS_Store
+Thumbs.db
