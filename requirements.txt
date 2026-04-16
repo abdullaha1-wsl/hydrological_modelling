@@ -165,7 +165,6 @@ tinycss2==1.5.1
 tokenizers==0.22.1
 toml==0.10.2
 torch==2.9.1
-tornado @ file:///D:/bld/tornado_1756854854126/work
 tqdm==4.67.1
 traittypes==0.2.1
 transformers==4.57.3
@@ -181,7 +180,6 @@ websockets==15.0.1
 Werkzeug==3.1.6
 widgetsnbextension==4.0.14
 windows-curses==2.4.1
-wrapt @ file:///D:/bld/wrapt_1756851517414/work
 xclim==0.59.1
 xesmf==0.8.10
 yamale==6.1.0
