@@ -1,4 +1,4 @@
-# wflow_builder
+# Hydrological Modelling Builder
 
 A Python web application for gridded hydrological modelling, powered by Julia and driven by geospatial data from Google Earth Engine (GEE).
 
