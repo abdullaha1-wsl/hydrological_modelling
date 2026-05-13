@@ -141,6 +141,4 @@ Ensure all environment variables defined in `config.py` are set in your deployme
 | `julia_runner.py` | Manages Wflow.jl execution as a Julia subprocess |
 | `model_builder.py` | Assembles Wflow.jl model configuration and static input maps |
 
-## License
 
-Add your license here.
